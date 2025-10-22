@@ -31,11 +31,11 @@ const getLoadoutById = async (req, res) => {
  */
 const updateLoadout = async (req, res) => {
   const { id } = req.params; // Get ID from URL
-  const { name, primaryWeapon, subWeapon, gadget1, gadget2 } = req.body; // Get data from request body
-  const values = [name, primaryWeapon, subWeapon, gadget1, gadget2, id];
+  const { name, primaryWeapon, subWeapon, gadget1, gadget2, price } = req.body; // Get data from request body
+  const values = [name, primaryWeapon, subWeapon, gadget1, gadget2, price, id];
 
   const query =
-    "UPDATE loadouts SET name = $1, primaryweapon = $2, subweapon = $3, gadget1 = $4, gadget2 = $5 WHERE id = $6 RETURNING *";
+    "UPDATE loadouts SET name = $1, primaryweapon = $2, subweapon = $3, gadget1 = $4, gadget2 = $5, price = $6 WHERE id = $7 RETURNING *";
 
   try {
     const result = await pool.query(query, values);

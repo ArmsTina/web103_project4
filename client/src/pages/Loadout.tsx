@@ -1,33 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import type { type_loadout } from "../types";
+// Import the Equipment type
+import type { type_loadout, Equipment } from "../types";
 
-// LoadoutItem component for displaying a single item
+// LoadoutItem component
 const LoadoutItem = ({ name, label }: { name: string; label: string }) => {
-  // Construct the image path: /assets/item-name.webp (spaces removed)
   const imagePath = `/assets/${name.replace(" ", "")}.webp`;
 
   return (
-    // Styles the individual item card
     <div className="bg-gray-700 p-4 rounded-lg flex flex-col items-center shadow-inner h-full">
-      {/* Label (e.g., "Primary") */}
       <p className="text-sm text-gray-400 font-medium mb-2">{label}</p>
-
-      {/* Image container */}
       <div className="flex-grow flex items-center justify-center w-full mb-2">
         <img
           src={imagePath}
           alt={name}
           className="h-20 w-full object-contain"
-          // Fallback image in case the original image fails to load
           onError={(e) => {
             e.currentTarget.src = `https://placehold.co/150x100/2d3748/ffffff?text=${name}`;
           }}
         />
       </div>
-
-      {/* Item name */}
       <p className="text-white font-semibold text-center text-sm mt-auto">
         {name}
       </p>
@@ -42,18 +35,34 @@ function Loadout() {
 
   // --- State Management ---
   const [loadout, setLoadout] = useState<type_loadout | null>(null);
+  // ✨ State to store all equipment prices
+  const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // --- Data Fetching ---
   useEffect(() => {
-    const fetchLoadout = async () => {
+    const fetchData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const response = await axios.get(`http://localhost:3001/loadout/${id}`);
-        setLoadout(response.data);
+        // ✨ Fetch both the loadout and all equipment prices in parallel
+        const [loadoutRes, equipmentRes] = await Promise.all([
+          axios.get(`http://localhost:3001/loadout/${id}`),
+          axios.get("http://localhost:3001/equipments"),
+        ]);
+
+        // Set the loadout
+        setLoadout(loadoutRes.data);
+
+        // Set and validate all equipment prices (like in Home.tsx)
+        const eqData: Equipment[] = equipmentRes.data;
+        const validatedData = eqData.map((item) => ({
+          ...item,
+          price: parseFloat(item.price as any) || 0,
+        }));
+        setAllEquipment(validatedData);
       } catch (err) {
         // Handle errors
         if (axios.isAxiosError(err)) {
@@ -66,15 +75,41 @@ function Loadout() {
       }
     };
 
-    fetchLoadout();
+    fetchData();
   }, [id]); // Re-run effect if 'id' changes
+
+  // Calculate total price using useMemo
+  const totalPrice = useMemo(() => {
+    // Wait until both loadout and equipment data are loaded
+    if (!loadout || allEquipment.length === 0) {
+      return 0;
+    }
+
+    // Create a simple map for quick price lookups
+    const priceMap = new Map<string, number>();
+    allEquipment.forEach((item) => {
+      priceMap.set(item.name, item.price);
+    });
+
+    // Get the names of the items in the current loadout
+    const itemNames = [
+      loadout.primaryweapon,
+      loadout.subweapon,
+      loadout.gadget1,
+      loadout.gadget2,
+    ];
+
+    // Sum the prices
+    return itemNames.reduce((sum, name) => {
+      return sum + (priceMap.get(name) || 0);
+    }, 0);
+  }, [loadout, allEquipment]); // Recalculate only if these change
 
   // Handles the click event for the "Delete" button
   const handleDelete = async () => {
     if (window.confirm("Are you sure you want to delete this loadout?")) {
       try {
         await axios.delete(`http://localhost:3001/loadout/${id}`);
-
         alert("Loadout deleted successfully.");
         navigate("/loadouts"); // Redirect user
       } catch (err) {
@@ -87,6 +122,8 @@ function Loadout() {
       }
     }
   };
+
+  // --- Render Logic ---
 
   if (isLoading) {
     return (
@@ -128,10 +165,20 @@ function Loadout() {
   return (
     <div className="max-w-4xl mx-auto p-4">
       <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-6 sm:p-8 transition-all duration-300 ease-in-out hover:shadow-cyan-500/20 hover:border-cyan-500">
-        {/* Loadout Name */}
-        <h2 className="text-3xl font-bold text-white mb-6 tracking-wide text-center sm:text-left">
-          {loadout.name}'s Loadout
-        </h2>
+        {/* ✨ Updated Header with Total Price */}
+        <div className="flex flex-col sm:flex-row justify-between sm:items-baseline mb-6">
+          {/* Loadout Name */}
+          <h2 className="text-3xl font-bold text-white mb-2 sm:mb-0 tracking-wide text-center sm:text-left">
+            {loadout.name}'s Loadout
+          </h2>
+          {/* Total Price */}
+          <div className="text-center sm:text-right">
+            <span className="text-lg text-gray-400 block">Total Cost</span>
+            <span className="text-3xl font-extrabold text-cyan-400 font-mono">
+              ${totalPrice.toFixed(2)}
+            </span>
+          </div>
+        </div>
 
         {/* Grid for loadout items */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">

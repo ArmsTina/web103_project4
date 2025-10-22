@@ -66,7 +66,7 @@ function Loadouts() {
   return (
     <div>
       {loadouts.map((loadout: type_loadout) => (
-        <Card loadout={loadout}></Card>
+        <Card loadout={loadout} totalPrice={loadout.price}></Card>
       ))}
     </div>
   );

@@ -1,13 +1,26 @@
-import React from "react";
 import { Link } from "react-router-dom";
 import type { type_loadout } from "../types";
 
-const Card = ({ loadout }: { loadout: type_loadout }) => {
+const Card = ({
+  loadout,
+  totalPrice,
+}: {
+  loadout: type_loadout;
+  totalPrice: number;
+}) => {
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-6 transition-all duration-300 ease-in-out hover:shadow-cyan-500/20 hover:border-cyan-500 transform hover:-translate-y-1">
-      <h2 className="text-2xl font-bold text-white mb-4 tracking-wide">
-        {loadout.name}'s Loadout
-      </h2>
+      <div className="flex flex-col sm:flex-row justify-between sm:items-baseline mb-4">
+        <h2 className="text-2xl font-bold text-white mb-2 sm:mb-0 tracking-wide">
+          {loadout.name}'s Loadout
+        </h2>
+        <div className="text-left sm:text-right">
+          <span className="text-sm text-gray-400 block">Total Cost</span>
+          <span className="text-2xl font-extrabold text-cyan-400 font-mono">
+            ${totalPrice}
+          </span>
+        </div>
+      </div>
 
       <div className="space-y-5">
         {/* Primary Weapon Section */}

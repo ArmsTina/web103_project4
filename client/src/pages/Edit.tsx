@@ -1,7 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import type { Equipment, type_loadout, ItemCardProps } from "../types";
+
+// Define the SelectedItem type, as seen in the Home component
+type SelectedItem = {
+  name: string;
+  price: number;
+};
 
 const ItemCard = ({
   item,
@@ -25,7 +31,10 @@ const ItemCard = ({
   return (
     <div
       className={`${baseClasses} ${borderClasses} ${interactionClasses}`}
-      onClick={() => !isDisabled && onSelect()}
+      // Pass the SelectedItem object on select, not just the name
+      onClick={() =>
+        !isDisabled && onSelect({ name: item.name, price: item.price })
+      }
     >
       <img
         src={imagePath}
@@ -38,6 +47,10 @@ const ItemCard = ({
       />
       <p className="text-white font-semibold text-center text-sm">
         {item.name}
+      </p>
+      {/* Add price display, as seen in Home component */}
+      <p className="text-cyan-400 text-xs font-mono font-bold">
+        ${item.price.toFixed(2)}
       </p>
     </div>
   );
@@ -56,16 +69,23 @@ function Edit() {
   const [availableGadgets, setAvailableGadgets] = useState<Equipment[]>([]);
 
   // --- Form State (Pre-filled and Updated) ---
+  // State now holds the SelectedItem object, not just the name string
   const [loadoutName, setLoadoutName] = useState("");
-  const [primary, setPrimary] = useState<string | null>(null);
-  const [sub, setSub] = useState<string | null>(null);
-  const [gadget1, setGadget1] = useState<string | null>(null);
-  const [gadget2, setGadget2] = useState<string | null>(null);
+  const [primary, setPrimary] = useState<SelectedItem | null>(null);
+  const [sub, setSub] = useState<SelectedItem | null>(null);
+  const [gadget1, setGadget1] = useState<SelectedItem | null>(null);
+  const [gadget2, setGadget2] = useState<SelectedItem | null>(null);
 
   // --- UI/Loading State ---
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  // --- Calculate Total Price ---
+  const totalPrice = useMemo(() => {
+    const items = [primary, sub, gadget1, gadget2];
+    return items.reduce((sum, item) => sum + (item?.price || 0), 0);
+  }, [primary, sub, gadget1, gadget2]);
 
   // --- Combined Fetch Effect: Items & Current Loadout ---
   useEffect(() => {
@@ -80,11 +100,17 @@ function Edit() {
         );
         const data: Equipment[] = itemsResponse.data;
 
+        // Validate data and ensure price is a number
+        const validatedData = data.map((item) => ({
+          ...item,
+          price: parseFloat(item.price as any) || 0,
+        }));
+
         const primaryWeapons: Equipment[] = [];
         const subWeapons: Equipment[] = [];
         const gadgets: Equipment[] = [];
 
-        data.forEach((item) => {
+        validatedData.forEach((item) => {
           if (item.item_type === "primaryWeapon") primaryWeapons.push(item);
           else if (item.item_type === "subWeapon") subWeapons.push(item);
           else if (item.item_type === "gadget") gadgets.push(item);
@@ -94,6 +120,12 @@ function Edit() {
         setAvailableSub(subWeapons);
         setAvailableGadgets(gadgets);
 
+        // Helper function to find full item details from a name
+        const getItemDetails = (name: string): SelectedItem | null => {
+          const item = validatedData.find((e) => e.name === name);
+          return item ? { name: item.name, price: item.price } : null;
+        };
+
         // 2. Fetch current loadout details (only if ID is present)
         if (id) {
           const loadoutResponse = await axios.get(
@@ -102,11 +134,12 @@ function Edit() {
           const loadout: type_loadout = loadoutResponse.data;
 
           // Populate form state with existing loadout data
+          // Convert stored names back into SelectedItem objects
           setLoadoutName(loadout.name);
-          setPrimary(loadout.primaryweapon);
-          setSub(loadout.subweapon);
-          setGadget1(loadout.gadget1);
-          setGadget2(loadout.gadget2);
+          setPrimary(getItemDetails(loadout.primaryweapon));
+          setSub(getItemDetails(loadout.subweapon));
+          setGadget1(getItemDetails(loadout.gadget1));
+          setGadget2(getItemDetails(loadout.gadget2));
         }
       } catch (err) {
         let errorMessage = "Failed to load necessary data.";
@@ -136,12 +169,14 @@ function Edit() {
       return;
     }
 
+    // Send the item names, not the full objects
     const updatedLoadout = {
       name: loadoutName,
-      primaryWeapon: primary,
-      subWeapon: sub,
-      gadget1: gadget1,
-      gadget2: gadget2,
+      primaryWeapon: primary.name,
+      subWeapon: sub.name,
+      gadget1: gadget1.name,
+      gadget2: gadget2.name,
+      price: totalPrice,
     };
 
     try {
@@ -200,7 +235,7 @@ function Edit() {
   return (
     <div className="max-w-4xl mx-auto p-4">
       <h1 className="text-4xl font-bold mb-2 tracking-wider text-cyan-400">
-        Edit Loadout {loadoutName}
+        Edit Loadout: {loadoutName}
       </h1>
       <p className="text-gray-400 mb-8">
         Modify your selections and save the updated loadout configuration.
@@ -235,8 +270,10 @@ function Edit() {
               <ItemCard
                 key={weapon.name}
                 item={weapon}
-                isSelected={primary === weapon.name}
-                onSelect={() => setPrimary(weapon.name)}
+                // Check against the name property of the state object
+                isSelected={primary?.name === weapon.name}
+                // Receive the full SelectedItem object
+                onSelect={(selected) => setPrimary(selected)}
               />
             ))}
           </div>
@@ -250,8 +287,8 @@ function Edit() {
               <ItemCard
                 key={weapon.name}
                 item={weapon}
-                isSelected={sub === weapon.name}
-                onSelect={() => setSub(weapon.name)}
+                isSelected={sub?.name === weapon.name}
+                onSelect={(selected) => setSub(selected)}
               />
             ))}
           </div>
@@ -265,11 +302,13 @@ function Edit() {
               <ItemCard
                 key={gadget.name}
                 item={gadget}
-                isSelected={gadget1 === gadget.name}
+                isSelected={gadget1?.name === gadget.name}
                 // Disable if already selected as Gadget 2
-                isDisabled={gadget2 === gadget.name}
-                onSelect={() => {
-                  setGadget1(gadget.name);
+                isDisabled={gadget2?.name === gadget.name}
+                onSelect={(selected) => {
+                  // Add logic to deselect gadget 2 if same is chosen
+                  if (gadget2?.name === selected.name) setGadget2(null);
+                  setGadget1(selected);
                 }}
               />
             ))}
@@ -284,17 +323,27 @@ function Edit() {
               <ItemCard
                 key={gadget.name}
                 item={gadget}
-                isSelected={gadget2 === gadget.name}
+                isSelected={gadget2?.name === gadget.name}
                 // Disable if already selected as Gadget 1
-                isDisabled={gadget1 === gadget.name}
-                onSelect={() => setGadget2(gadget.name)}
+                isDisabled={gadget1?.name === gadget.name}
+                onSelect={(selected) => setGadget2(selected)}
               />
             ))}
           </div>
         </section>
 
         {/* Message and Submit Button */}
-        <div className="pt-4">
+        <div className="pt-4 space-y-4">
+          {/* Total Price Display */}
+          <div className="flex justify-between items-center bg-gray-800 p-4 rounded-lg border-2 border-cyan-700 shadow-md shadow-cyan-900/50">
+            <span className="text-xl font-bold tracking-wide text-gray-200">
+              Total Loadout Cost:
+            </span>
+            <span className="text-3xl font-extrabold text-cyan-400 font-mono">
+              ${totalPrice.toFixed(2)}
+            </span>
+          </div>
+
           {message && (
             <div
               className={`p-3 rounded-lg text-center font-medium ${

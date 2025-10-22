@@ -11,10 +11,10 @@ const getLoadouts = async (req, res) => {
 };
 
 const postLoadouts = async (req, res) => {
-  const { name, primaryWeapon, subWeapon, gadget1, gadget2 } = req.body;
-  const values = [name, primaryWeapon, subWeapon, gadget1, gadget2];
+  const { name, primaryWeapon, subWeapon, gadget1, gadget2, price } = req.body;
+  const values = [name, primaryWeapon, subWeapon, gadget1, gadget2, price];
   const query =
-    "INSERT INTO loadouts (name, primaryweapon, subweapon, gadget1, gadget2) VALUES ($1, $2, $3, $4, $5) RETURNING *";
+    "INSERT INTO loadouts (name, primaryweapon, subweapon, gadget1, gadget2, price) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
   try {
     const result = await pool.query(query, values);
     res.status(201).json(result.rows[0]);
